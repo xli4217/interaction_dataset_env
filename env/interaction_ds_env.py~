@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+
+import numpy as np
+from rl_pipeline.configuration.configuration import Configuration
+
+from future.utils import viewitems
+import time
+import os
+import ctypes
+
+from utils import map_vis_without_lanelet
+from utils import dataset_reader
+from utils import dataset_types
+from utils import map_vis_lanelet2
+from utils import tracks_vis
+from utils import dict_utils
+
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
+
+
+###########
+# Helpers # 
+###########
+
+def update_plot():
+    global fig, timestamp, title_text, track_dictionary, patches_dict, text_dict, axes
+    # update text and tracks based on current timestamp
+    assert(timestamp <= timestamp_max), "timestamp=%i" % timestamp
+    assert(timestamp >= timestamp_min), "timestamp=%i" % timestamp
+    assert(timestamp % dataset_types.DELTA_TIMESTAMP_MS == 0), "timestamp=%i" % timestamp
+    title_text.set_text("\nts = {}".format(timestamp))
+    tracks_vis.update_objects_plot(timestamp, track_dictionary, patches_dict, text_dict, axes)
+    fig.canvas.draw()
+
+
+def start_playback():
+    global timestamp, timestamp_min, timestamp_max, playback_stopped
+    playback_stopped = False
+    plt.ion()
+    while timestamp < timestamp_max and not playback_stopped:
+        timestamp += dataset_types.DELTA_TIMESTAMP_MS
+        start_time = time.time()
+        update_plot()
+        end_time = time.time()
+        diff_time = end_time - start_time
+        plt.pause(max(0.001, dataset_types.DELTA_TIMESTAMP_MS / 1000. - diff_time))
+    plt.ioff()
+
+
+class FrameControlButton(object):
+    def __init__(self, position, label):
+        self.ax = plt.axes(position)
+        self.label = label
+        self.button = Button(self.ax, label)
+        self.button.on_clicked(self.on_click)
+
+    def on_click(self, event):
+        global timestamp, timestamp_min, timestamp_max, playback_stopped
+
+        if self.label == "play":
+            if not playback_stopped:
+                return
+            else:
+                start_playback()
+                return
+        playback_stopped = True
+        if self.label == "<<":
+            timestamp -= 10*dataset_types.DELTA_TIMESTAMP_MS
+        elif self.label == "<":
+            timestamp -= dataset_types.DELTA_TIMESTAMP_MS
+        elif self.label == ">":
+            timestamp += dataset_types.DELTA_TIMESTAMP_MS
+        elif self.label == ">>":
+            timestamp += 10*dataset_types.DELTA_TIMESTAMP_MS
+        timestamp = min(timestamp, timestamp_max)
+        timestamp = max(timestamp, timestamp_min)
+        update_plot()
+
+
+###############
+# Environment #
+###############
+        
+default_config = {
+    # Common to all envs
+    "seed": 10,
+    "synchronous": True,
+    "debug": False,
+    "state_space": None,
+    "action_space": None,
+    "get_state": None,
+    "get_reward": None,
+    "reset": None,
+    "is_done": None,
+    # specific to this env
+    "headless": False,
+    "tracks_dir": "../recorded_trackfiles",
+    "maps_dir": "../maps",
+    "lanelet_map_ending": ".osm",
+    "scenario_name": 'DR_CHN_Roundabout_LN',
+    "track_file_prefix": "vehicle_tracks_",
+    "track_file_ending": ".csv",
+    "track_file_number": 0
+}
+
+class InteractionDatasetEnv(object):
+
+    def __init__(self, config=default_config, seed=None, logger=None):
+        self.config = Configuration(config)
+        self.name = "InteractionDatasetEnv"
+
+        self.seed = seed
+        self.set_seed(seed)
+        
+        self.logger = logger
+        self.all_info = {}
+
+        self.lanelet_map_file =self.config['maps_dir'] + "/" + self.config['scenario_name'] + self.config['lanelet_map_ending']
+
+        print(self.lanelet_map_file)
+        
+        self.scenario_dir = self.config['tracks_dir'] + "/" + self.config['scenario_name']
+
+        print(self.scenario_dir)
+        
+        self.track_file_name = self.config['scenario_dir'] + "/" + self.config['track_file_prefix'] + self.config['track_file_number'] + self.config['track_file_ending']
+
+        print(self.track_file_name)
+        
+    def render(self):
+        pass
+        
+    def update_all_info(self):
+        pass
+
+    def get_info(self):
+        return self.all_info
+
+    def get_state(self, all_info):
+        self.update_all_info()
+        return np.random.rand(1)
+
+    def get_reward(self, state=None, action=None, next_state=None, all_info={}):
+        pass
+
+    def is_done(self, state=None, action=NOne, next_state=None, all_info={}):
+        pass
+
+    def reset(self, **kwargs):
+        pass
+
+    def step(self, actions, axis=0):
+        pass
+
+    @property
+    def state_space(self):
+        return self.config.get('state_space')
+
+    @property
+    def action_space(self):
+        return self.config.get('action_space')
+
+    def teleop(self, cmd):
+        pass
+
+    def stop(self):
+        pass
+
+    def pause(self):
+        pass
+
+    def close(self):
+        pass
+
+    def set_seed(self, seed):
+        pass
+
+if __name__ == "__main__":
+    config = {
+        # Common to all envs
+        "seed": 10,
+        "synchronous": True,
+        "debug": False,
+        "state_space": None,
+        "action_space": None,
+        "get_state": None,
+        "get_reward": None,
+        "reset": None,
+        "is_done": None,
+        # specific to this env
+        "headless": False,
+        "tracks_dir": "../recorded_trackfiles",
+        "maps_dir": "../maps",
+        "lanelet_map_ending": ".osm",
+        "track_file_prefix": "vehicle_tracks_",
+        "track_file_ending": ".csv",
+        "track_file_number": 0
+    }
+
+    cls = InteractionDatasetEnv(config)
+    
